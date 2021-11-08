@@ -8,8 +8,11 @@ either GNU/Linux or MacOS.  You will also need to have the
 following software installed:
 
 - BEAST 2.6 (https://beast2.org/)
-- BDMM-Prime (https://github.com/tgvaughan/BDMM-Prime)
-- feast (https://github.com/tgvaughan/feast)
+- BDMM-Prime (BEAST package, https://github.com/tgvaughan/BDMM-Prime)
+- feast package (BEAST package, https://github.com/tgvaughan/feast)
+- R (https://r-project.org)
+- tidyverse (R packages, https://tidyverse.org)
+- ggdist (R package, https://mjskay.github.io/ggdist/)
 
 Once these are installed, follow the instructions given in the files
 `CH/README.md` (Swiss analyses) and `NZ/README.md` (NZ analyses) to
