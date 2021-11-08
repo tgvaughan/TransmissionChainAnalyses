@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<beast beautitemplate='Standard' beautistatus=''
+       namespace="beast.core
+                  :beast.evolution.alignment
+                  :beast.evolution.tree.coalescent
+                  :beast.core.util
+                  :feast.fileio
+                  :feast.parameter
+                  :feast.function
+                  :feast.expressions
+                  :bdmmprime.distribution
+                  :bdmmprime.parameterization
+                  :bdmmprime.util.priors
+                  :beast.core.parameter
+                  :beast.evolution.nuc
+                  :beast.evolution.tree
+                  :beast.evolution.operators
+                  :beast.evolution.sitemodel
+                  :beast.evolution.substitutionmodel
+                  :beast.evolution.likelihood" required="" version="2.6">
+
+    <map name="Uniform" >beast.math.distributions.Uniform</map>
+    <map name="Exponential" >beast.math.distributions.Exponential</map>
+    <map name="LogNormal" >beast.math.distributions.LogNormalDistributionModel</map>
+    <map name="Normal" >beast.math.distributions.Normal</map>
+    <map name="Beta" >beast.math.distributions.Beta</map>
+    <map name="Gamma" >beast.math.distributions.Gamma</map>
+    <map name="LaplaceDistribution" >beast.math.distributions.LaplaceDistribution</map>
+    <map name="prior" >beast.math.distributions.Prior</map>
+    <map name="InverseGamma" >beast.math.distributions.InverseGamma</map>
+    <map name="OneOnX" >beast.math.distributions.OneOnX</map>
+
+
+  <!-- Model -->
+
+  <changeTimes id="ReChangeTimes" spec="RealParameterFromXSV"
+               fileName="ReChangeTimes.txt"/>
+  <skylineValues id="ReValues" spec="RealParameterFromFunction">
+    <function spec="ExpCalculator" value="1[1:(len(ReChangeTimes)+1)]"
+              arg="@ReChangeTimes"/>
+  </skylineValues>
+
+  <changeTimes id="sampPropChangeTimes" spec="RealParameterFromXSV"
+               fileName="sampPropChangeTimes.txt"/>
+  <skylineValues id="sampValues" spec="RealParameterFromFunction">
+    <function spec="ExpCalculator" value="0.01[1:(len(sampPropChangeTimes)+1)]"
+              arg="@sampPropChangeTimes"/>
+  </skylineValues>
+
+  <CTFactor id="CTFactor" spec="feast.function.Concatenate">
+    <plate var="idx" range="1:3">
+      <arg id="CTFactor$(idx)" spec="feast.modelselect.ModelSelectionParameter" thisIndex="0">
+        <parameter id="CTFactor$(idx)False" spec="RealParameter" value="1.0"/>
+        <parameter id="CTFactor$(idx)True" spec="RealParameter" value="1.0" upper="1.0"/>
+        <selectionIndices id="CTFactor$(idx)Indicator" spec="IntegerParameter" value="0" upper="1" lower="0"/>
+      </arg>
+    </plate>
+    <arg spec="RealParameter" value="1.0"/>  <!-- applies in period *before* 2 days following first sample in each outbreak -->
+  </CTFactor>
+
+  <becomeUninfectiousRate id="buSkyline" spec="SkylineVectorParameter">
+    <skylineValues id="buValues" spec="RealParameter" value="36.5"/>
+  </becomeUninfectiousRate>
+
+  <removalProb id="removProbSkyline" spec="SkylineVectorParameter">
+    <skylineValues spec="RealParameter" value="1.0"/>
+  </removalProb>
+
+  <siteModel id="siteModel" spec="SiteModel" gammaCategoryCount="4">
+    <parameter id="gammaShape" name="shape">1.0</parameter>
+    <parameter name="mutationRate">1.0</parameter>
+    <parameter name="proportionInvariant">0.0</parameter>
+    <substModel spec="HKY">
+      <kappa id="kappa" spec="RealParameter" value="2.0"/>
+      <frequencies spec="Frequencies">
+        <frequencies id="frequencies" spec="RealParameter"
+                     lower="0.0" upper="1.0"
+                     dimension="4" value="0.25"/>
+      </frequencies>
+    </substModel>
+  </siteModel>
+
+  <branchRateModel id="branchRateModel" spec="beast.evolution.branchratemodel.StrictClockModel">
+    <parameter id="clockRate" name="clock.rate" value="8e-4"/>
+  </branchRateModel>
+
+
+  <!-- Alignments -->
+  <plate var="cluster" range="$(all)">
+    <alignment spec="AlignmentFromFasta" fileName="sequences/$(prefix).fasta"
+               endsWith="|$(cluster)"
+               id="align_$(cluster)"/>
+
+    <finalSampleOffset id="fso_$(cluster)" spec="RealParameterFromLabelledXSV"
+                       fileName="sequences/$(prefix).FSOs.txt"
+                       rowLabels="$(cluster)"
+                       colLabels="finalSampleOffset"/>
+
+    <ctAges id="CTAges_$(cluster)" spec="RealParameterFromLabelledXSV"
+            fileName="sequences/$(prefix).FSOs.txt"
+            rowLabels="$(cluster)"
+            colLabels="changeAge1,changeAge2,changeAge3"/>
+
+  </plate>
+
+  <popFunc id="popFunc" spec="beast.evolution.tree.coalescent.ConstantPopulation">
+    <popSize spec="RealParameter" value="0.01"/> <!-- For tree initialization only -->
+  </popFunc>
+
+  <run id="mcmc" spec="MCMC" chainLength="1000000000">
+
+    <state id="state" spec="State" storeEvery="5000">
+      <plate var="cluster" range="$(all)">
+        <stateNode id="tree_$(cluster)" spec="RandomTree"
+                   taxa="@align_$(cluster)" populationModel="@popFunc">
+          <trait spec="TraitSetFromTaxonSet" delimiter="|" takeGroup="2"
+                 traitname="date-forward"
+                 dateFormat="yyyy-MM-dd">
+            <taxa spec="TaxonSet" alignment="@align_$(cluster)"/>
+          </trait>
+        </stateNode>
+
+        <stateNode id="origin_$(cluster)" spec="RealParameter" value="0.9"/>
+      </plate>
+
+      <stateNode idref="ReValues"/>
+      <stateNode idref="ReTheta"/>
+
+      <plate var="idx" range="1:3">
+        <stateNode idref="CTFactor$(idx)True"/>
+        <stateNode idref="CTFactor$(idx)Indicator"/>
+      </plate>
+
+      <stateNode idref="sampValues"/>
+
+      <stateNode idref="kappa"/>
+      <stateNode idref="gammaShape"/>
+      <stateNode idref="frequencies"/>
+    </state>
+
+
+    <!-- Target distribution -->
+
+    <distribution id="posterior" spec="CompoundDistribution">
+
+      <!-- === Tree likelihoods === -->
+
+      <distribution id="likelihood" spec="CompoundDistribution">
+
+        <plate var="cluster" range="$(nonSingletons)">
+          <distribution spec="ThreadedTreeLikelihood" data="@align_$(cluster)"
+                        tree="@tree_$(cluster)"
+                        siteModel="@siteModel"
+                        branchRateModel="@branchRateModel"/>
+        </plate>
+
+      </distribution>
+
+      <distribution id="prior" spec="CompoundDistribution">
+
+      <!-- === Tree priors  === -->
+      
+      <plate var="cluster" range="$(all)">
+        <distribution id="treePrior_$(cluster)" spec="BirthDeathMigrationDistribution"
+                      tree="@tree_$(cluster)"
+                      finalSampleOffset="@fso_$(cluster)">
+
+          <!-- <parameterization id="param_$(cluster)" spec="bdmmprime.parameterization.EpiParameterization" -->
+          <parameterization id="param_$(cluster)" spec="bdmmprime.parameterization.EpiParameterizationMod"
+                            becomeUninfectiousRate="@buSkyline"
+                            removalProb="@removProbSkyline"
+                            origin="@origin_$(cluster)">
+            <R0 id="r0sv_$(cluster)" spec="SkylineVectorParameter" timesAreAges="true" origin="@origin_$(cluster)">
+              <skylineValues idref="ReValues"/>
+              <changeTimes idref="ReChangeTimes"/>
+            </R0>
+            <R0mod spec="SkylineVectorParameter" timesAreAges="true" origin="@origin_$(cluster)">
+                <skylineValues idref="CTFactor"/>
+              <changeTimes idref="CTAges_$(cluster)"/>
+            </R0mod>
+            <samplingProportion id="spsv_$(cluster)" spec="SkylineVectorParameter"
+                                timesAreAges="true" origin="@origin_$(cluster)">
+              <skylineValues idref="sampValues"/>
+              <changeTimes idref="sampPropChangeTimes"/>
+            </samplingProportion>
+          </parameterization>
+          
+        </distribution>
+
+        <!-- Upper bound on origin is 2020-01-01 (assumes final sample at 2020-11-30) -->
+        <distribution id="originPrior_$(cluster)" spec="beast.math.distributions.Prior" x="@origin_$(cluster)">
+          <Uniform name="distr" lower="0.001" upper="0.9144422"/>
+        </distribution>
+
+      </plate>
+
+
+      <!-- === Parameter priors === -->
+
+      <!-- Re Skyline prior -->
+      
+      <distribution id="ReSGPrior" spec="OUSkyGridPrior" x="@ReValues"
+                    M="0.8" S="0.5">
+        <theta id="ReTheta" spec="RealParameter" value="0.095" lower="0" upper="15"/>
+      </distribution>
+
+      <distribution id="ReThetaPrior" spec="beast.math.distributions.Prior" x="@ReTheta">
+        <Exponential name="distr">
+          <parameter name="mean">1.0</parameter>
+        </Exponential>
+      </distribution>
+
+      <!-- Sampling prop prior -->
+
+      <!-- Use a product of a 1/x with a uniform here to specify a log-uniform on [0.0001,U] -->
+      <distribution id="sampPriorRecip" spec="beast.math.distributions.Prior" x="@sampValues">
+        <OneOnX name="distr"/>
+      </distribution>
+      <distribution id="sampPriorUnif" spec="beast.math.distributions.Prior" x="@sampValues">
+        <Uniform name="distr" lower="0.0001" upper="$(sampUB=1.0)"/>
+      </distribution>
+
+      <!-- Substitution model parameter priors -->
+
+      <prior id="KappaPrior" name="distribution" x="@kappa">
+        <LogNormal name="distr">
+          <parameter estimate="false" name="M">1.0</parameter>
+          <parameter estimate="false" name="S">1.25</parameter>
+        </LogNormal>
+      </prior>
+
+      <prior id="GammaShapePrior" name="distribution" x="@gammaShape">
+        <Exponential name="distr">
+          <parameter estimate="false" name="mean">0.5</parameter>
+        </Exponential>
+      </prior>
+
+
+      </distribution>
+    </distribution>
+
+
+    <!-- Tree operators: apply only to non-singleton clusters -->
+
+    <plate var="cluster" range="$(nonSingletons)">
+      <operator id="WB_$(cluster)" spec="WilsonBalding" tree="@tree_$(cluster)" weight="1.0"/>
+      <operator id="WX_$(cluster)" spec="Exchange" isNarrow="false" tree="@tree_$(cluster)" weight="1.0"/>
+      <operator id="NX_$(cluster)" spec="Exchange" tree="@tree_$(cluster)" weight="1.0"/>
+      <operator id="Unif_$(cluster)" spec="Uniform" tree="@tree_$(cluster)" weight="1.0"/>
+      <operator id="TS1_$(cluster)" spec="ScaleOperator" rootOnly="true" scaleFactor="0.95" tree="@tree_$(cluster)" weight="1.0"/>
+      <operator id="TS2_$(cluster)" spec="ScaleOperator" scaleFactor="0.95" tree="@tree_$(cluster)" weight="1.0"/>
+    </plate>
+
+    <!-- Parameter operators: -->
+
+    <operator id="ReOp" spec="ScaleOperator" scaleFactor="0.8" parameter="@ReValues" weight="30.0"/>
+    <operator id="ReThetaOp" spec="ScaleOperator" scaleFactor="0.8" parameter="@ReTheta" weight="1.0"/>
+
+    <plate var="idx" range="1:3">
+      <operator id="CTFactor$(idx)Op" spec="ScaleOperator" scaleFactor="0.8" parameter="@CTFactor$(idx)True" weight="10.0"/>
+      <operator id="CTFactor$(idx)IndicatorOp" spec="IntRandomWalkOperator" windowSize="$(ctEst)" parameter="@CTFactor$(idx)Indicator" weight="10.0"/>
+    </plate>
+              
+    <operator id="sampOp" spec="ScaleOperator" scaleFactor="0.8" parameter="@sampValues" weight="30.0"/>
+    <operator id="kappaOp" spec="ScaleOperator" scaleFactor="0.8" parameter="@kappa" weight="1.0"/>
+    <operator id="gammaShapeOp" spec="ScaleOperator" scaleFactor="0.8" parameter="@gammaShape" weight="1.0"/>
+    <operator id="freqOp" spec="DeltaExchangeOperator" parameter="@frequencies" delta="0.1" weight="1.0"/>
+
+    <plate var="cluster" range="$(all)">
+      <operator id="originOp_$(cluster)" spec="ScaleOperator" scaleFactor="0.8"
+                parameter="@origin_$(cluster)" weight="1.0"/>
+    </plate>
+
+
+    <!-- Loggers -->
+
+    <logger spec="Logger" logEvery="1000000">
+      <log idref="posterior"/>
+      <log idref="ReSGPrior"/>
+      <log idref="ReTheta"/>
+    </logger>
+    
+    <logger spec="Logger" logEvery="10000" fileName="results/$(filebase).$(prefix).sampUB$(sampUB).$(ctEst).$(seed).log">
+      <log idref="posterior"/>
+      <log idref="likelihood"/>
+      <log idref="prior"/>
+      <log idref="frequencies"/>
+      <log idref="kappa"/>
+      <log idref="gammaShape"/>
+      <log idref="ReTheta"/>
+      <log idref="ReValues"/>
+      <log idref="sampValues"/>
+      <log idref="CTFactor"/>
+      <plate var="idx" range="1:3">
+        <log idref="CTFactor$(idx)True"/>
+        <log idref="CTFactor$(idx)False"/>
+        <log idref="CTFactor$(idx)Indicator"/>
+      </plate>
+
+      <log id="maxOrigin" spec="ExpCalculator" value="max(origins)">
+        <arg id="origins" spec="Concatenate">
+          <plate var="cluster" range="$(all)">
+            <arg idref="origin_$(cluster)"/>
+          </plate>
+        </arg>
+      </log>
+
+      <log id="maxHeight" spec="ExpCalculator" value="max(heights)">
+        <arg id="heights" spec="Concatenate">
+          <plate var="cluster" range="$(all)">
+            <arg spec="Slice" index="0" count="1">
+              <arg spec="TreeStatLogger" tree="@tree_$(cluster)"/>
+            </arg>
+          </plate>
+        </arg>
+      </log>
+
+    </logger>
+
+    <plate var="cluster" range="$(clustersToLog=)">
+      <logger spec="Logger" logEvery="100000" fileName="results/$(filebase).$(prefix).sampUB$(sampUB).$(ctEst).$(seed).c$(cluster).trees">
+        <log idref="tree_$(cluster)"/>
+      </logger>
+    </plate>
+
+    </run>
+ 
+</beast>
