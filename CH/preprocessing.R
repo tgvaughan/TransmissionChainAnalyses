@@ -1,17 +1,3 @@
----
-title: Pre-processing for BDSKY analysis
----
-
-Extract sequence dates:
-```{sh}
-for prefix in max_chains min_chains; do
-    (echo "date	cluster"; \
-     grep '^>' sequences/$prefix.fasta | cut -d'|' -f3,4 | sed -e 's/|/	/' ) > sequences/$prefix.dates.txt
-done
-```
-
-Load into R:
-```{r }
 library(tidyverse)
 library(lubridate)
 
@@ -19,11 +5,10 @@ prefixes <- c("max_chains",
               "min_chains")
 
 finalSampleDate <- ymd("2020-11-30")
-```
 
-Calculate final sample offsets and contact tracing start times:
-(We assume that contact tracing begins 2 days following the first sample.)
-```{r }
+## Calculate final sample offsets and contact tracing start times:
+## (We assume that contact tracing begins 2 days following the first sample.)
+
 data <- list()
 
 ctActive <- ymd("2020-06-15")
@@ -47,10 +32,9 @@ for (prefix in prefixes) {
                
     write_tsv(offsets, paste0("sequences/", prefix, ".FSOs.txt"))
 }
-```
 
-Create list of non-singleton clusters and write it to nonSingletons.txt:
-```{r }
+## Create list of non-singleton clusters and write it to nonSingletons.txt:
+
 for (prefix in prefixes) {
 
     clusterSizes <- data[[prefix]] %>%
@@ -62,10 +46,9 @@ for (prefix in prefixes) {
     write_tsv(clusterSizes %>% filter(n>1) %>% select(cluster),
               paste0("sequences/", prefix, ".nonSingleton_clusters.txt"), col_names=FALSE)
 }
-```
 
-Set up weekly change times in R0 going back 52 weeks:
-```{r }
+## Set up weekly change times in R0 going back 52 weeks:
+
 changeAges <- read_csv("sequences/date_to_week.csv") %>%
     distinct(week) %>%
     transmute(age=as.numeric(finalSampleDate - week)/365.25) %>%
@@ -73,10 +56,9 @@ changeAges <- read_csv("sequences/date_to_week.csv") %>%
     arrange(desc(row_number()))
 
 write_tsv(changeAges, "ReChangeTimes.txt", col_names=FALSE)
-```
 
-Set up change times in sampling proportion (chosen by Sarah):
-```{r }
+## Set up change times in sampling proportion:
+
 sampPropChangeDates <- ymd(c("2020-04-23",
                              "2020-06-25",
                              "2020-09-14",
@@ -87,21 +69,3 @@ sampPropChangeAges <- sort(as.numeric(finalSampleDate - sampPropChangeDates)/365
 write_tsv(tibble(changeTimes=sampPropChangeAges),
                  "sampPropChangeTimes.txt",
                  col_names=FALSE)
-```
-
-Sarah has provided a CSV file containing clusters whose trees she
-would like to also log.  Let's load this and convert it into something
-that can be easily provided to the analysis:
-```{r }
-
-clusters_to_log <- read_csv("sequences/CHE_chains_to_log.csv") %>%
-    group_by(chains_assumption) %>%
-    distinct(chain_idx) %>%
-    transmute(cluster=chain_idx) %>%
-    ungroup()
-
-for (clustering in c("min", "max")) {
-    write_tsv(clusters_to_log %>% filter(chains_assumption==clustering) %>% select(cluster),
-              paste0("sequences/", clustering, "_chains.toLog.txt"), col_names=FALSE)
-}
-```

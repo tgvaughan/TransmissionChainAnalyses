@@ -1,16 +1,9 @@
----
-title: post-processing
----
-
-```{r }
 library(tidyverse)
 library(lubridate)
 library(ggdist)
-```
 
 ## Load data
 
-```{r }
 skyline_data <- NULL
 for (clusters in c("min", "max")) {
     for (contact_tracing in c(TRUE, FALSE)) {
@@ -54,13 +47,8 @@ for (clusters in c("min", "max")) {
         }
     }
 }
-```
 
 ## Incoroporate interval dates
-
-```{r }
-
-## dates <- tibble(interval=0:52) %>% mutate(date=ymd("2020-11-30")-3.5-interval*7)
 
 finalSampleDate <- ymd("2020-11-30")
 Re_dates <- read_csv("sequences/date_to_week.csv") %>%
@@ -75,13 +63,9 @@ sampProp_dates <- read_csv("sampPropChangeTimes.txt", col_names=c("age")) %>%
     mutate(date=finalSampleDate - 365.25*age) %>%
     arrange(age) %>%
     mutate(interval=row_number())
-```
 
 ## Plot skylines
 
-**In the final plots, make sure to add monthly/bi-weekly axis ticks.**
-
-```{r }
 ggplot(skyline_data %>% filter(variable=="Re") %>% left_join(Re_dates),
        aes(date, median, col=contact_tracing, fill=contact_tracing)) +
     geom_ribbon(aes(x, ymin=ylow, ymax=yhigh),
@@ -107,11 +91,8 @@ ggplot(skyline_data %>% filter(variable=="sampProp") %>% left_join(sampProp_date
     ylab("Sampling proportion") + ggtitle("Sampling proportion estimates") +
     theme(axis.text.x=element_text(angle=-45, hjust=0))
 ggsave("figures/sampProp.pdf", width=15, height=5, units="in")
-```
 
 ## Contact tracing effect size
-
-```{r }
 
 CT_data <- NULL
 for (clusters in c("min", "max")) {
@@ -161,27 +142,3 @@ ggplot(CT_data %>% filter(contact_tracing, lessThanOne),
     xlab("") +
     ylab("Damping coefficients (conditioned on being <1)")
 ggsave("figures/CT_conditionedDamping.pdf")
-```
-
-## Re plot for Sarah
-
-```{r }
-ggplot(all_data %>%
-       left_join(dates) %>%
-       filter(variable=="Re") %>%
-       filter(clusters=="max") %>%
-       filter(contact_tracing == FALSE),
-       aes(date, median)) +
-    ## geom_ribbon(aes(x, ymin=ylow, ymax=yhigh),
-    ##           data=tibble(x=c(ymd("2020-06-15"), ymd("2020-09-30")),
-    ##                       ylow=c(0,0), yhigh=c(Inf,Inf),
-    ##                       median=0.5, contact_tracing=TRUE),
-    ##           fill="grey", col=NA, alpha=0.5) +
-    geom_ribbon(aes(ymin=low, ymax=high), alpha=0.5) +
-    geom_line() +
-    geom_hline(yintercept=1, linetype="dashed") +
-    scale_x_date(date_breaks="1 month", date_labels="%b %Y") +
-    xlab("") + ylab("Re") + ggtitle("Re estimate") +
-    theme(axis.text.x=element_text(angle=-45, hjust=0))
-ggsave("figures/Re_Sarah.pdf", width=10, height=4, units="in")
-```
