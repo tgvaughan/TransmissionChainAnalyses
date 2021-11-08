@@ -1,4 +1,4 @@
-# CH Phylodynamic Analysis Files
+# Nadeau et al. 2021 Phylodynamic Analysis Scripts
 
 This repository contains the files necessary to reproduce the Swiss
 SARS-CoV-2 phylodynamic analyses presented in Nadeau et al. 2021.
