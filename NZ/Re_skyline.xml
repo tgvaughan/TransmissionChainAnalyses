@@ -36,11 +36,11 @@
   <changeTimes id="ReChangeTimes" spec="RealParameterFromXSV"
                fileName="ReChangeTimes.txt"/>
   <skylineValues id="ReValues" spec="RealParameterFromFunction">
-    <function spec="ExpCalculator" value="1[1:(len(ReChangeTimes)+1)]"
+    <function spec="ExpCalculator" value="1.1[1:(len(ReChangeTimes)+1)]"
               arg="@ReChangeTimes"/>
   </skylineValues>
 
-  <skylineValues id="sampValues" spec="RealParameter" value="0.01"/>
+  <skylineValues id="sampValues" spec="RealParameter" value="0.01 0.0"/>
 
   <CTFactor id="CTFactor" spec="feast.function.Concatenate">
     <plate var="idx" range="1:2">
@@ -102,20 +102,27 @@
     <popSize spec="RealParameter" value="0.01"/> <!-- For tree initialization only -->
   </popFunc>
 
+  <plate var="cluster" range="$(all)">
+    <tree id="tree_$(cluster)" spec="RandomTree"
+          taxa="@align_$(cluster)" populationModel="@popFunc">
+      <trait spec="TraitSetFromTaxonSet" delimiter="|" takeGroup="2"
+             traitname="date-forward"
+             dateFormat="yyyy-MM-dd">
+        <taxa spec="TaxonSet" alignment="@align_$(cluster)"/>
+      </trait>
+    </tree>
+  </plate>
+
+
   <run id="mcmc" spec="MCMC" chainLength="1000000000">
 
     <state id="state" spec="State" storeEvery="5000">
-      <plate var="cluster" range="$(all)">
-        <stateNode id="tree_$(cluster)" spec="RandomTree"
-                   taxa="@align_$(cluster)" populationModel="@popFunc">
-          <trait spec="TraitSetFromTaxonSet" delimiter="|" takeGroup="2"
-                 traitname="date-forward"
-                 dateFormat="yyyy-MM-dd">
-            <taxa spec="TaxonSet" alignment="@align_$(cluster)"/>
-          </trait>
-        </stateNode>
+      <plate var="cluster" range="$(nonSingletons)">
+        <stateNode idref="tree_$(cluster)"/>
+      </plate>
 
-        <stateNode id="origin_$(cluster)" spec="RealParameter" value="0.9"/>
+      <plate var="cluster" range="$(all)">
+        <stateNode id="origin_$(cluster)" spec="RealParameter" value="0.79"/>
       </plate>
 
       <stateNode idref="ReValues"/>
@@ -175,14 +182,16 @@
             <samplingProportion id="spsv_$(cluster)" spec="SkylineVectorParameter"
                                 timesAreAges="true" origin="@origin_$(cluster)">
               <skylineValues idref="sampValues"/>
+              <changeTimes spec="RealParameterFromXSV"
+                           fileName="sequences/$(prefix).sampleChangeTime.txt"/>
             </samplingProportion>
           </parameterization>
           
         </distribution>
 
-        <!-- Upper bound on origin is 2020-01-01 (assumes final sample at 2020-11-30) -->
+        <!-- Upper bound on origin is 2020-02-15 (assumes final sample at 2020-11-30) -->
         <distribution id="originPrior_$(cluster)" spec="beast.math.distributions.Prior" x="@origin_$(cluster)">
-          <Uniform name="distr" lower="0.001" upper="0.9144422"/>
+          <Uniform name="distr" lower="0.001" upper="0.7917808"/>
         </distribution>
 
       </plate>
@@ -206,10 +215,10 @@
       <!-- Sampling prop prior -->
 
       <!-- Use a product of a 1/x with a uniform here to specify a log-uniform on [0.0001,0.05] -->
-      <distribution id="sampPriorRecip" spec="beast.math.distributions.Prior" x="@sampValues">
+      <distribution id="sampPriorRecip" spec="bdmmprime.util.priors.ZeroExcludingPrior" x="@sampValues">
         <OneOnX name="distr"/>
       </distribution>
-      <distribution id="sampPriorUnif" spec="beast.math.distributions.Prior" x="@sampValues">
+      <distribution id="sampPriorUnif" spec="bdmmprime.util.priors.ZeroExcludingPrior" x="@sampValues">
         <Uniform name="distr" lower="0.0001" upper="$(sampUB=1.0)"/>
       </distribution>
 

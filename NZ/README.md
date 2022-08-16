@@ -11,7 +11,7 @@ commands from the command line will reproduce the results.
 ## Step 1: Sequence date extraction
 
 ```bash
-$ ./extract_sequence_data.sh
+$ ./extract_sequence_dates.sh
 ```
 
 ### Step 2: Data pre-processing

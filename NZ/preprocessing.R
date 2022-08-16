@@ -1,10 +1,6 @@
 library(tidyverse)
 library(lubridate)
 
-## Run script to extract sequence dates and cluster information from
-## fasta files.
-system("./extract_sequence_dates.sh")
-
 prefixes <- c("max_chains",
               "min_chains")
 
@@ -31,6 +27,12 @@ for (prefix in prefixes) {
         select(-zone1start, -zone2start) 
                
     write_tsv(offsets, paste0("sequences/", prefix, ".FSOs.txt"))
+
+    sampleChangeTime <- (data[[prefix]]
+        %>% summarize(sampleChangeTime = (finalSampleDate-min(date)+1)/365.25))
+    write_tsv(sampleChangeTime,
+              paste0("sequences/",prefix,".sampleChangeTime.txt"),
+              col_names=FALSE)
 }
 
 ## Create list of non-singleton clusters and write it to nonSingletons.txt:
@@ -54,3 +56,7 @@ changeAges <- read_csv("sequences/date_to_week.csv") %>%
     arrange(desc(row_number()))
 
 write_tsv(changeAges, "ReChangeTimes.txt", col_names=FALSE)
+
+## Compute upper bound on time of origin:
+originUpperBound <- as.numeric(finalSampleDate-ymd("2020-02-15"))/365
+cat(paste("Use an upper bound on the origin of:", originUpperBound, "\n"))
