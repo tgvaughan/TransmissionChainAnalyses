@@ -1,5 +1,7 @@
 # Nadeau et al. 2021 Phylodynamic Analysis Scripts
 
+[![DOI](https://zenodo.org/badge/425794183.svg)](https://zenodo.org/badge/latestdoi/425794183)
+
 This repository contains the files necessary to reproduce the Swiss
 SARS-CoV-2 phylodynamic analyses presented in Nadeau et al. 2021.
 
