@@ -17,3 +17,9 @@ following software installed:
 Once these are installed, follow the instructions given in the files
 `CH/README.md` (Swiss analyses) and `NZ/README.md` (NZ analyses) to
 reproduce the results.
+
+## License
+
+The source code in this repository is made available under the terms
+of version 3 of the GNU General Public License.  A copy of this license
+can be found in the file named COPYING.
