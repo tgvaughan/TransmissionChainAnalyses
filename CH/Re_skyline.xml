@@ -317,11 +317,13 @@
 
     </logger>
 
+    <!-- Uncomment the below and provide -D clustersToLog=1,2,.. to log certain cluster trees -->
+    <!--
     <plate var="cluster" range="$(clustersToLog=)">
       <logger spec="Logger" logEvery="100000" fileName="results/$(filebase).$(prefix).sampUB$(sampUB).$(ctEst).$(seed).c$(cluster).trees">
         <log idref="tree_$(cluster)"/>
       </logger>
-    </plate>
+    </plate> -->
 
     </run>
  
