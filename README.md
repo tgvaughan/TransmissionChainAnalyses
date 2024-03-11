@@ -11,6 +11,7 @@ following software installed:
 
 - BEAST 2.6 (https://beast2.org/)
 - BDMM-Prime (BEAST package, https://github.com/tgvaughan/BDMM-Prime)
+  Version 0.0.24: https://github.com/tgvaughan/BDMM-Prime/releases/tag/v0.0.24
 - feast package (BEAST package, https://github.com/tgvaughan/feast)
 - R (https://r-project.org)
 - tidyverse (R packages, https://tidyverse.org)
